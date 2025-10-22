@@ -1,1 +1,1 @@
-# nf-journal-2024
+# nf-journal

@@ -1,0 +1,164 @@
+\documentclass[dvipdfmx,openany]{jsbook}
+\usepackage[dvipdfmx]{graphicx}                     % 画像表示
+\usepackage{amsmath, amssymb, amsfonts, mathtools}  % 数式表示
+\usepackage{amsthm}                                 % 定理表示
+\usepackage[dvipdfmx]{hyperref}                     % 参考文献リンク
+\usepackage{subcaption}                             % 小さいキャプション
+\usepackage{url}                                    % url表示
+\usepackage{enumerate}                              % 箇条書き
+\usepackage{ascmac}                                 % 枠囲み
+\usepackage{tcolorbox}                              % 枠囲み(プロンプト部分)
+\usepackage{listings,jvlisting}                     % ソースコード表示
+\usepackage{algpseudocode}                          % 疑似コード表示
+\usepackage{algorithm}                              % アルゴリズム表示
+\usepackage{booktabs}                               % 表の罫線
+\usepackage{multirow}                               % 表のセル結合
+\tcbuselibrary{breakable}
+% \usepackage[dvipdfmx]{xcolor}                   % 参考文献リンク
+
+\newcommand{\bhline}[1]{\noalign{\hrule height #1}}
+\addtolength{\fullwidth}{-26truemm}  % 全体の幅(ヘッダ部の幅)を既定値から26mm小さくする
+\setlength{\textwidth}{\fullwidth}   % 本文の幅(textwidth)を全体の幅(=ヘッダ部の幅)にそろえる
+\setlength{\evensidemargin}{1truemm} % 偶数ページの左余白を1mm(+1インチ)にする
+\setlength{\oddsidemargin}{19truemm} % 奇数ページの左余白を19mm(+1インチ)にする
+\numberwithin{equation}{section}     % 式番号を(1.〇)で表示する
+\setcounter{tocdepth}{2}             % subsubsectionまで目次に表示する
+
+%%% ソースコード表示の設定 %%%
+\lstset{
+  basicstyle={\ttfamily},
+  identifierstyle={\small},
+  commentstyle={\smallitshape},
+  keywordstyle={\small\bfseries},
+  ndkeywordstyle={\small},
+  stringstyle={\small\ttfamily},
+  frame={tb},
+  breaklines=true,
+  columns=[l]{fullflexible},
+  numbers=left,
+  xrightmargin=0zw,
+  xleftmargin=3zw,
+  numberstyle={\scriptsize},
+  stepnumber=1,
+  numbersep=1zw,
+  lineskip=-0.5ex
+}
+\renewcommand{\lstlistingname}{コード}
+
+%%%% 表紙用設定 %%%%
+\hoffset0mm
+\voffset0mm
+\makeatletter
+\let\@@shipout\shipout
+\def\shipout\vbox{\@@shipout\vbox\bgroup\afterassignment\insertBackGround\let\reserved@a=}
+\def\insertBackGround#1{#1%
+        \iftombow
+                \copy\BackGround\kern0pt
+        \else
+                \kern-1truein\moveleft1truein\copy\BackGround\kern1truein
+        \fi}
+\newbox\BackGroundUnit
+\newbox\BackGround
+\def\@haikei#1{
+\setbox\BackGroundUnit\hbox{\includegraphics*[width=\paperwidth]{#1}}
+\@tempdima\paperheight
+\advance\@tempdima\ht\BackGroundUnit\advance\@tempdima\dp\BackGroundUnit
+\setbox\BackGround\vbox to \@tempdima{
+        \@tempdima=\paperwidth\advance\@tempdima\wd\BackGroundUnit
+        \leaders\hbox to\@tempdima{\leaders\copy\BackGroundUnit\hfil}\vfil
+}
+\wd\BackGround=0pt\ht\BackGround=0pt\dp\BackGround=0pt
+}
+\newcommand{\incluedefullgraphics}[1]{\pagestyle{empty}\@haikei{#1}\null}
+\makeatother
+%%%%%%%%%%%%%%%%%%%%
+
+\begin{document}
+\begin{titlepage}
+  \thispagestyle{empty}
+  \incluedefullgraphics{cover.png}
+\end{titlepage}
+
+\chapter*{はじめに}
+\input{introduction.tex}
+
+\tableofcontents
+
+\chapter{カメラ入力を用いた強化学習によるライントレーサの実現}\label{chap:line-tracer}
+\input{line-tracer/line-tracer.tex}
+
+\chapter{目線で操るマウスカーソル}\label{chap:eye-track-cursor}
+\input{eye-track-cursor/eye-track-cursor.tex}
+
+\chapter{KaiRAくんを動かそう}\label{chap:moving-kaira-kun}
+\input{moving-kaira-kun/moving-kaira-kun.tex}
+
+\chapter{最強じゃんけんAI}\label{chap:no-lose-janken}
+\input{no-lose-janken/no-lose-janken.tex}
+
+\chapter{京大シラバス検索RAGシステム - システム概要編}\label{chap:syllabus-rag-overview}
+\input{syllabus-rag/syllabus-rag-miyamae.tex}
+
+\chapter{京大シラバス検索RAGシステム - 検索手法編}\label{chap:syllabus-rag-search}
+\input{syllabus-rag/syllabus-rag-kambara.tex}
+
+\chapter{お絵描き予測AI}\label{chap:draw-forecast}
+\input{draw-forecast/draw-forecast.tex}
+
+\bibliographystyle{junsrt}
+\bibliography{
+    line-tracer/line-tracer,
+    eye-track-cursor/eye-track-cursor,
+    moving-kaira-kun/moving-kaira-kun,
+    no-lose-janken/no-lose-janken,
+    syllabus-rag/syllabus-rag-miyamae,
+    syllabus-rag/syllabus-rag-kambara,
+    draw-forecast/draw-forecast
+}
+\nocite{*}
+
+\chapter*{本会誌について}
+\section*{執筆者}
+\subparagraph*{第\ref{chap:line-tracer}章：カメラ入力を用いた強化学習によるライントレーサの実現}
+平塚謙良
+\subparagraph*{第\ref{chap:eye-track-cursor}章：目線で操るマウスカーソル}
+稲葉陽孔
+\subparagraph*{第\ref{chap:moving-kaira-kun}章：KaiRAくんを動かそう}
+岡本和優
+\subparagraph*{第\ref{chap:no-lose-janken}章：最強じゃんけんAI}
+千葉一世
+\subparagraph*{第\ref{chap:syllabus-rag-overview}章：京大シラバス検索RAGシステム - システム概要編}
+宮前明生
+\subparagraph*{第\ref{chap:syllabus-rag-search}章：京大シラバス検索RAGシステム - 検索手法編}
+神原みちる
+\subparagraph*{第\ref{chap:draw-forecast}章：お絵描き予測AI}
+千葉一世
+
+
+\section*{京都大学人工知能研究会KaiRA}
+\subparagraph*{代　　表} 松田拓巳
+\subparagraph*{活動日時} 毎週木曜日 18:30〜
+\subparagraph*{活動場所} 文学部教室・株式会社Deepcraft\ 京都オフィス（百万遍ビル3F）など
+\subparagraph*{入会資格} 大学、学部、回生問わず、AIに興味がある方
+\subparagraph*{会　　費} 無料
+\subparagraph*{活動内容} 機械学習に関する本の輪読会、コード読み・実装会、kaggleへの参加など
+
+
+\begin{table}[b]
+	\centering
+	\begin{tabular}{lcll}
+		\multicolumn{4}{c}{ {\LARGE 会誌 vol.8} }	\\
+		\bhline{1pt}
+		発行日 && 2024年11月吉日　初版発行&\\
+		発行 && 京都大学人工知能研究会KaiRA&\\
+		公式サイト && \url{https://kyoto-kaira.github.io/}&\\
+    メールアドレス && \url{kyoto.kaira@gmail.com}&\\
+		X(旧Twitter) && \url{https://x.com/kyoto_kaira}&\\
+		\bhline{1pt}
+	\end{tabular}
+\end{table}
+
+\end{document}
+
+
+

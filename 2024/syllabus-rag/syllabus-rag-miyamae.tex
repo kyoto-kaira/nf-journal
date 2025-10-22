@@ -1,0 +1,229 @@
+\section{京大シラバス検索RAGシステムの基本情報}
+\subsection{シラバスとRAGシステム}
+シラバスとは、京都大学情報教務システムKULASISが公開している京都大学の科目の情報が載っているページである\cite{kulasis}。これは京都大学の学生・職員でなくとも閲覧することができる。シラバス検索というページから、知りたい科目の条件（学部、学科、曜時限等）で検索をして、各科目のページに飛ぶことができる。各科目のページには以下のような項目がある。括弧の中の項目は一部の科目にある。
+
+\begin{itemize}
+  \item 科目ナンバリング、科目名、英訳
+  \item 所属部局・職名・氏名
+  \item 使用言語、単位数、授業形態、開講年度・開講期、配当学年、対象学生、曜時限、（時間数）、（キーワード）
+  \item 授業の概要・目的、到達目標、授業計画と内容、（題目）
+  \item 履修要件、成績評価の方法・観点、教科書、参考書等、授業外学修、（関連URL）、（実務経験のある教員による授業）
+\end{itemize}
+
+RAG（Retrieval-Augmented Generation）とは、LLM（大規模言語モデル）の文章生成に外部データの検索機能を組み合わせる手法である。似た手法にファインチューニングがあるが、これは事前学習されたLLMをさらに外部データで学習させる手法である。今回は外部データを京大シラバスとして、RAGシステムを実装した。また、1つの検索対象のテキストの集まりを\textbf{チャンク}と呼ぶ。
+
+今回の実装では、\textbf{データの埋め込み}（文章をベクトル化すること）の計算が多く、前処理を変更するたびに埋め込みをすると時間がかかるので、大学院の専門科目（約10000科目）を除いた全学共通科目と学部の専門科目（約8000科目）だけを利用した。さらに、この中で医学部医学科だけがシラバスがPDFで個別の処理が必要なので、医学部医学科の科目も除外した。最終的に外部データとしたのは、全学共通科目と医学部医学科以外の学部の専門科目となった。
+
+\subsection{実装の優先事項と概要}
+今回の実装をするに当たって、自分が最も重要視したことが実用性である。RAGシステムの基本的な流れは、ChatGPTなどと同様に質問を入力して、質問のテキストと類似度が高い外部データのテキストを抽出し、質問と抽出したデータを入力としてLLMで回答を生成する。今回の実装したRAGシステムは、京都大学の学生の要求に対応した科目の検索ができるようになることを想定している。従って、質問と類似度が高い外部データのテキストを抽出する前に、外部データの\textbf{絞り込み}が必要だと考えた。つまり、シラバス検索ページのような科目の条件（学部、学科、曜時限等）で絞り込みをする機能をRAGシステムに組み込む形で実装をすることに決めた。
+
+実装で使用したプログラミング言語はPythonで、主に使用したライブラリは、LLMの機能拡張をするためのLangchain\cite{langchain}、外部データの埋め込みを扱えるFAISS\cite{langchain-faiss}と、前処理をする際にHTMLからテキストを抽出するためのBeautiful Soup\cite{beautifulsoup}と、Pythonで簡単にWebアプリを実装できるStreamlit\cite{streamlit}である。LLMのモデルはGoogleが開発したGemini\cite{gemini}を使用しており、無料でAPIを利用できる。埋め込みのモデルはHuggingFaceEmbeddingsの多言語に対応している\texttt{intfloat/multilingual-e5-base}\cite{intfloat_multilingual_e5_base}を使用した。
+
+\section{絞り込み}
+\subsection{KULASISの絞り込みのための検索項目}
+科目の条件で絞り込みを行うときに参考にするのは、もちろんKULASISのシラバス検索だが、これには京都大学の学生・職員でなくとも利用できる\textbf{全科目のあるシラバス検索}と、京都大学の学生・職員がログインして利用できる\textbf{全学共通科目だけのシラバス検索}と、スマートフォンでの\textbf{KULASISアプリで利用できるシラバス検索}が存在し、少し検索項目に違いがあることが分かった。それぞれの検索項目を表にすると表\ref{tab:syllabus-search}のようになった。
+
+\begin{table}[h]
+\centering
+\caption{シラバス検索の検索項目}
+\label{tab:syllabus-search}
+\begin{tabular}{cccc}\hline
+ & 全科目のシラバス & 全学共通科目のシラバス & アプリのシラバス\\ \hline
+学部／大学院& 〇 & - & 〇\\
+課程& × & 〇 & 〇\\
+学科& 〇 & - & 〇\\
+群& 〇 & 〇 & 〇\\
+旧群& ×& × & 〇\\
+開講期& 〇 & 〇 & 〇\\
+曜時限& 〇 & 〇 & 〇\\
+授業形態& 〇 & 〇 & 〇\\
+E科目& × & 〇 & 〇\\
+使用言語& 〇 & 〇 & 〇\\
+対象学生& × & 〇 & 〇\\
+レベル& 〇 & 〇 & 〇\\
+学問分野& 〇 & 〇 & 〇\\
+科目名& × & 〇 & 〇\\
+キーワード& 〇 & 〇 & 〇\\
+教員名& 〇 & 〇 & 〇\\
+実務経験科目& × & 〇 & 〇\\ \hline
+\end{tabular}
+\end{table}
+
+説明が必要だと感じた検索項目は以下のようになる。
+
+\begin{itemize}
+  \item 課程 --- 学部、大学院
+  \item 旧群 --- A群、B群、C群、D群(平成25から27年の入学者向け)
+  \item 開講期 --- 前期、後期、前期集中、後期集中など
+  \item 授業形態 --- 講義、演習、実験など
+  \item E科目 --- E1、E2、E3
+  \item 対象学生 --- 全学向、文系向、理系向、留学生
+  \item レベル --- 導入的な内容、基礎的な内容、発展的な内容、卒業論文・卒業研究関連など
+  \item 学問分野 --- 情報学基礎、地球環境学、哲学、言語学など
+  \item 科目名 --- 科目名に含まれる文字を入力する
+  \item キーワード --- シラバスに載っている言葉・文字を入力する
+  \item 教員名 --- 担当教員に含まれる文字を入力する
+  \item 実務経験科目 --- 実務経験科目の主要な4つ形式の科目とその他の科目
+\end{itemize}
+
+シラバス検索から絞り込みに使う検索項目について以下のように整理して考えた。
+
+\begin{itemize}
+  \item 各科目のシラバスのページ以外にシラバス一覧のページから細かい科目の区分の情報が得られる。
+  \begin{itemize}
+    \item 全学共通科目の群の中でも、例えば人文社会科目の中に哲学・思想、歴史・文明、地域・文化などのさらなる区分が存在する。これらの区分を\textbf{分野}とする。
+    \item 学部の中には、工学部のように地球工学科や物理工学科などの学科の区分や、総合人間学部のように人間科学系や国際文明学系などの学科以外の区分が存在する。これらの区分を\textbf{学科など}とする。
+  \end{itemize}
+  \item \textbf{レベル}と\textbf{学問分野}は各科目のシラバスのページに情報が載っていないので、前処理でこの情報を取り出せず、絞り込みに利用するのは困難である。
+  \item \textbf{課程}はそもそも今回の実装では大学院の専門科目を除外しているので、絞り込みに利用する価値が低い。
+  \item \textbf{旧群}は現在適用される人がいないので絞り込みに必要ない。
+  \item \textbf{科目名}は\textbf{キーワード}に包含されることが可能である。
+  \item \textbf{実務経験科目}は選択肢の文章が長く見栄えが悪い上に、そもそも実務経験科目が少なく絞り込みに利用する価値が低い。
+\end{itemize}
+
+以上のことからKULASISのシラバス検索から絞り込みに使う検索項目は、\textbf{学部、学科など、群、分野、開講期、曜時限、授業形態、E科目、使用言語、対象学生、キーワード、教員名}とした。
+
+\subsection{追加した絞り込みのための検索項目}\label{sec:additional-search-item}
+今までは、検索項目はシラバスのページから容易に抽出できることが前提だった。しかし、LLMを利用すれば、各科目のシラバスの内容から新たに検索項目を生成できる。どのように検索項目を生成するのかを詳しく説明すると、入力に対する出力が必ずJSONというデータ形式になるモードである\textbf{JSONモード}を使用する。検索項目として生成するのは、KULASISの検索項目で抽出が困難だとして断念した\textbf{レベル}や\textbf{学問}の他に、シラバスの履修要件にある履修していることが望ましいとされた科目や、シラバスの成績評価の方法・観点にある定期試験や平常点などの評価指標の占める成績評価の割合などが考えられる。
+
+しかし、検索項目を生成するにはAPIへのリクエストが必要であり、Gemini APIの無料枠の場合、1分間に15リクエスト、1日に約1500リクエストという上限がさだめられている。これでは、約8000個のシラバスのデータから検索項目を生成するには、多くの実行時間や日数が必要となる。これらを削減する手段として以下のようなものがある。
+
+\begin{enumerate}
+  \item 複数のAPIキーを使用する
+  \item 同時に複数の科目のテキストを入力として検索項目を生成する
+  \item 同時に複数の種類の検索項目を生成する
+\end{enumerate}
+
+今回の実装では、まずは検索項目は有用性の観点から成績の評価指標の割合を追加することにしたが、手法2を試すと複数の科目が、例えば哲学1とその他の哲学1のように科目の内容が被ったときに、出力が1つになって上手く行かなかった。時間の兼ね合いもあり、検索項目は有用性の観点から\textbf{成績指標の割合}だけを追加した。
+
+\subsection{絞り込みの方法1 metadatas}
+絞り込みの検索候補は決定した。次に絞り込みの方法を説明する。LangChainのFAISSには、埋め込み時に辞書形式の\texttt{metadata}をチャンクごとに登録できる「\texttt{metadatas}」という機能がある。この機能には主に以下の2つの役割がある:
+
+\begin{enumerate}
+    \item \textbf{フィルタリング}: 指定した\texttt{metadata}のキーと値を持つチャンクに限定して類似度検索を実行する機能。
+    \item \textbf{情報の取得}: 検索結果から特定の\texttt{metadata}のキーを指定し、対応する値を引き出す機能。
+\end{enumerate}
+
+例えば、質問文を\texttt{query}（\texttt{int}型）、外部データを\texttt{texts}（\texttt{list}型）として、\texttt{metadatas}を活用したRAGを実行する場合、以下のような流れになる。
+
+\begin{lstlisting}[caption=metadatasの例]
+metadatas = [{"name":"philosophy",classtype":"lecture","timetable":"Tu2"},
+             {"name":"thermodynamics","classtype":"lecture","timetable":"Fr2"},
+             {"name":"physics experiment","classtype":"experiment","timetable":"Mo3,Mo4,Tu3,Tu4"}]
+store = FAISS.from_texts(texts,embedding,metadatas)
+a = store.similarity_search(query,filter={classtype":"lecture","timetable":"Tu2"})
+for i in range(len(a)):
+    print(a[i].metadata["name"])
+\end{lstlisting}
+
+\subsection{絞り込みの方法2 delete}
+\texttt{metadatas}の機能は便利だが、\texttt{metadatas}による絞り込みでは複数のkeyを指定するとAND検索になるので、OR検索ができないという欠点がある。これを解決するために次のような手法を考えた。Langchainではデータの埋め込みに時間がかかるので、埋め込み後にデータを絞り込む必要がある。ここで埋め込み後のデータを\textbf{FAISSファイル}と呼ぶ。FAISSファイルを扱えるのはLangChainの関数だけなので、その中からOR検索のためにdelete関数を利用する。\texttt{delete}関数は、FAISSファイルから削除したいIDをリストで指定して削除する関数である。削除したいIDを\texttt{deleteID}とすると、\texttt{delete}関数を用いたRAGの実行は以下のようになる。
+
+\begin{lstlisting}[caption=deleteの例]
+metadatas = [{"name":"philosophy"},{"name":"thermodynamics"},
+             {"name":"physics experiment"}]
+ids = [str(i) for i in range(len(texts))]
+store = FAISS.from_texts(texts,embedding,metadatas,ids = ids)
+deleteID = ["1","2"]
+store.delete(deleteID)
+a = store.similarity_search(query)
+for i in range(len(a)):
+    print(a[i].metadata["name"])
+\end{lstlisting}
+
+このように\texttt{delete}関数を用いることで、AND検索とOR検索を自由に行うことができる。
+
+\begin{itemize}
+  \item \textbf{AND検索} --- 複数の条件に当てはまるIDの集合の\textbf{和集合}を削除する
+  \item \textbf{OR検索} --- 複数の条件に当てはまるIDの集合の\textbf{積集合}を削除する
+\end{itemize}
+
+詳しく検索手法を知りたい場合は、GitHubの実装を確認してほしい。
+
+\section{前処理}
+\subsection{前処理の目的}
+前処理の目的は2つある。1つ目は、質問と外部データの類似度を計算するときに、外部データに科目に特有の情報だけがあることが望ましいので、外部データの共通したテキストや絞り込みで利用したテキストを除去することだ。2つ目は、説明した絞り込みの項目と方法に適したデータを外部データから抽出することだ。
+
+大まかな前処理の流れは以下のようになる。
+\begin{enumerate}
+  \item 全科目のURLを取得する
+  \item URLからHTMLを取得する
+  \item 絞り込みのためのデータを抽出・生成する
+  \item 類似度検索のためにデータをまとめる
+\end{enumerate}
+
+\subsection{URLの取得}
+まず、URLを取得するために、KULASISのシラバス一覧のページから全科目のURLをBeautifulsoupで取得する。医学部医学科の科目のURLは共通しているので除去する。人間総合学部の英米文学入門が学科の専門科目の最後なのでこれを取得したら実行を終了する。プログラムは以下のようになる。
+
+\begin{lstlisting}[caption=URLの取得]
+url1 = "https://www.k.kyoto-u.ac.jp/external/open_syllabus/all"
+response = requests.get(url1)
+soup = BeautifulSoup(response.content, "html.parser")
+urls = []
+for i in range(3,len(soup.find_all("a"))):
+    url = "https://www.k.kyoto-u.ac.jp/external/open_syllabus/"+str(soup.find_all("a")[i].attrs["href"])
+    if  url != "https://www.k.kyoto-u.ac.jp/external/open_syllabus/https://www.med.kyoto-u.ac.jp/for_students/affairs_m/class/":
+        urls.append(url)
+    if url == "https://www.k.kyoto-u.ac.jp/external/open_syllabus/department_syllabus?lectureNo=10192&departmentNo=61":
+        break
+\end{lstlisting}
+
+この後、取得したURLですべての科目のhtmlをリクエストする。これに3時間ほどかかった。科目の取得する順番もIDとして後で利用するので、IDを保存しながら非同期処理をするともっと早く実行できるかもしれない。
+
+\subsection{絞り込みのためのデータを抽出・生成}
+絞り込みのためのデータの形は以下の4パターンがある。
+
+\begin{itemize}
+  \item ラベルデータ --- 科目のラベルが\texttt{int}で保存されている。
+  \item 複数のラベルデータ --- 科目の複数のラベルが\texttt{list}の中に\texttt{int}で保存されている。
+  \item テキストデータ --- 科目に関するテキストが\texttt{int}で保存されている。空白でAND検索できるようにする。
+  \item 辞書データ --- 科目の情報が辞書形式で保存されている。
+\end{itemize}
+
+以下が全ての絞り込みのためのデータである。
+
+\begin{itemize}
+  \item \textbf{学部、群、学科など、分野} \\
+  各科目のhtmlを取得した時のIDとURLのIDから、科目の\textbf{学部、群、学科など、分野} を振り分けた。\textbf{学部、群、分野}はラベルデータ、\textbf{学科など}は複数のラベルデータとした。
+
+  \item \textbf{曜時限、授業形態、使用言語、開講年度・開講期、対象学生}\\
+  各科目のhtmlからそのまま取得した。\textbf{曜時限}は月1から金5と集中、\textbf{授業形態}は「講義」「演習」「実習」「実験」「特殊講義」「語学」「講読」「卒業研究」「ゼミナール」の単語を含むか、\textbf{使用言語}は「日本語」「英語」「日本語及び英語」「その他」で振り分けを行った。\textbf{曜時限、授業形態}は複数のラベルデータ、\textbf{使用言語、開講年度・開講期、対象学生}はラベルデータとした。
+
+  \item \textbf{E科目}\\
+  各科目の科目名にE1、E2、E3のいずれかを含むかで振り分けた。\textbf{E科目}はラベルデータとした。
+
+  \item \textbf{キーワード、教授・教員}\\
+  \textbf{キーワード}はシラバスの科目名、授業の概要・目的、到達目標、授業計画と内容、題目、キーワード、履修要件、成績評価の方法・観点、教科書、参考書等のテキストから成る。\textbf{教授・教員}はシラバスの所属部局、職 名、氏 名から成る。いずれもテキストデータとした。
+
+  \item \textbf{成績評価}\\
+  \ref{sec:additional-search-item}節で紹介した追加した絞り込みのための検索項目であり、JSONモードでシラバスの成績評価の方法・観点のテキストを\texttt{gradetext}として、以下のようなプロンプトで辞書データとして生成した。
+
+  \begin{verbatim}
+    f"次のJSONスキーマを使用して、{gradetext}の成績評価の方法・観点について、平常点、課題、発表、討論、小テスト、小レポート、期末レポート、期末試験のいずれか占める割合をリストアップしてください。seiseki = {'平常点': int, '課題': int, '発表': int, '討論': int, '小テスト': int, '小レポート': int, '期末レポート': int, '期末試験': int} Return: seiseki"
+  \end{verbatim}
+\end{itemize}
+
+\subsection{類似度検索のためにデータ}
+類似度検索のためにデータは、科目名、授業の概要・目的、到達目標、授業計画と内容で構成することにした。RAGでの精度向上のためにチャンクをどのように分割するかが議論になるが、京大シラバスRAGシステムにおいては1科目を複数のチャンクに分割すると情報が局所的となりテキストの全体から類似度を計算した方が良いと感じたので、科目とチャンクが一対一対応となるようにした。
+
+\subsection{その他の前処理}
+その他の前処理として以下のような処理をした。
+
+\begin{itemize}
+  \item \texttt{metadata}の登録\\
+  絞り込みは\texttt{delete}関数で行うが、要約を生成するときに\texttt{metadata}があると便利なので、「科目名」「URL」「ID」を登録した。
+
+  \item 要約生成のためのデータ\\
+  要約生成のためのデータは、シラバスの情報をほぼ全てテキストにした。要約生成のプロンプトもそこまで工夫せずに「以下の文章を日本語で箇条書きで要約を生成してください。」とした。
+\end{itemize}
+
+\section{改善案}
+今回の実装でできなかった改善案は以下のようになる。
+
+\begin{itemize}
+  \item さらに絞り込みのための検索項目を追加する。例えば、履修していることが望ましいとされた科目や科目のレベルなど。
+  \item チャンク分割をもっと工夫する。
+  \item 要約生成が安定しないときがあるので、要約のためのデータや要約生成のプロントを工夫する。
+  \item 教科書、参考書の情報も検索に組み込む。
+  \item シラバスの要約を外部データとして埋め込む。
+\end{itemize}
