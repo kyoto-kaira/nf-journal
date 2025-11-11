@@ -15,16 +15,20 @@
 \end{itemize}
 これにより、ユーザーは従来のタグベース検索では見つけにくい、自身の意図に近い楽曲を効率的に探索できます。\\
 \begin{figure}[h]
-\begin{center}
-\includegraphics[width=40mm]{music-gen/input.png}
+\centering
+\begin{minipage}{0.48\textwidth}
+\centering
+\includegraphics[width=\textwidth]{music-gen/input.png}
 \caption{クエリの入力例}
-\end{center}
-\end{figure}
-\begin{figure}[h]
-\begin{center}
-\includegraphics[width=40mm]{music-gen/big_picture.png}
+\label{fig:query-input}
+\end{minipage}
+\hfill
+\begin{minipage}{0.48\textwidth}
+\centering
+\includegraphics[width=\textwidth]{music-gen/big_picture.png}
 \caption{類似度の可視化結果}
-\end{center}
+\label{fig:similarity-viz}
+\end{minipage}
 \end{figure}
 \section{推論・可視化の流れ}
 \label{sec:inference_flow}
@@ -113,7 +117,7 @@ BERTのファインチューニングには事前に教師データを用意し�
     学習の目的は、正例ペア間の類似度を最大化し、負例として機能するバッチ内の非対応ペア間の類似度を最小化することで、エンコーダが楽曲の音響特徴と英訳されたテキスト表現の間の対応関係を学習することです。
 \end{enumerate}
 この手法でCLAPモデルをファインチューニングすることで、日本語クエリと楽曲の類似度測定に特化した性能向上がされました。\\
-実際に学習後のモデルを用いて、自然言語クエリと楽曲の類似度測定を行った結果、ユーザーの意図に近い楽曲が学習前の時より上位にランクインするなど、実用的な性能が確認された。\\
+実際に学習後のモデルを用いて、自然言語クエリと楽曲の類似度測定を行った結果、ユーザーの意図に近い楽曲が学習前の時より上位にランクインするなど、実用的な性能が確認されました。\\
 \begin{table}[h]
 \caption{「力強く歌うことで、葛藤から克服しようとしている」というクエリに対する類似度評価の比較}
 \begin{center}
@@ -134,6 +138,6 @@ BERTのファインチューニングには事前に教師データを用意し�
 \label{sec:conclusion-music}
 本研究では、自然言語クエリと楽曲オーディオを同一埋め込み空間で比較するシステムを提案しました。  
 ユーザーは感性的な日本語表現を用いるだけで、自身の意図に近い楽曲を効率的に探索・可視化できます。  
-しかし、「米津玄師みたいな曲」のような固有名詞を伴うクエリに対しては、CLAP の事前学習データに依存するため、十分な類似度評価が難しいため今後の課題となります。
+しかし、「米津玄師のような曲」など、特定の固有名詞を含むクエリに対する類似度評価については、CLAPの事前学習データへの依存度が高く、十分な精度を確保することが難しいという課題が残っています。
 今後はこういった面も含めて、CLAP のさらなる最適化、多ジャンル対応を行うことでより広範なユーザー体験の向上を目指します。
 

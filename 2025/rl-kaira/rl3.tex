@@ -1,20 +1,21 @@
 \section{はじめに}
 \label{sec:intro}
 近年、強化学習によってロボットの自律的な動作が可能になりつつあります。\\
-特にロボット分野では、学習したダイナミクスで接触遷移や外乱を見越し、凹凸路や滑り面での歩行・バランス回復を組み立てるといった事例が増えています。
+特にロボット分野では、学習したモデルで外部環境を認識し、凹凸路や滑り面での歩行・バランス回復を組み立てるといった事例が増えています。
 そして、それを応用して災害時の救助用ロボットが開発されたりしております。\\
-そこで今回は、強化学習による、KaiRAくんの２足歩行を図る手法—シミュレータ学習について解説します。
+今回は、歩くKaiRA君：強化学習を用いた二足歩行ロボットの歩行制御について解説します。
 % --- 第2章 ---
 \section{学習目標}
 \label{sec:target}
 本プロジェクトでは、Unity ML-Agentsを用いて、二足歩行ロボット（KaiRAくん）をシミュレーション環境で学習させる。\\
-学習環境には目標オブジェクトが存在し、図１の矢印の方向に置かれている。\\
+学習環境には目標オブジェクトが存在し、図\ref{fig:kaira-overview}の矢印の方向に置かれている。\\
 KaiRAくんは、4つの関節（左右の上脚・下脚）を持ち、できるだけ早く目標に向かって歩行することを目的とする。\\
 この目的を達成するために、観測情報を基に行動（関節の目標回転角と駆動強度）を決定し、報酬関数とPPO\cite{schulman2017proximal}を用いて学習を進める。\\
 \begin{figure}[h]
 \begin{center}
 \includegraphics[width=50mm]{rl-kaira/overview.png}
 \caption{KaiRAくんの概観}
+\label{fig:kaira-overview}
 \end{center}
 \end{figure}
 \\
@@ -47,12 +48,13 @@ KaiRAくんは、4つの関節（左右の上脚・下脚）を持ち、でき�
 \end{itemize}
 \subsubsection{クォータニオンとは}
 クォータニオンは、3次元空間での回転を「どの軸を元に」「どれだけ回転するか」を表現する数学的な方法です。\\
-図２で表すと、ベクトル$r^{'}$はベクトル$r$を軸$\vec{n}$の周りに$\theta$だけ回転させたものであり、これを表すには軸の情報(3次元)と回転量(1次元)が必要です。\\
+図\ref{fig:quaternion}で表すと、ベクトル$r^{'}$はベクトル$r$を軸$\vec{n}$の周りに$\theta$だけ回転させたものであり、これを表すには軸の情報(3次元)と回転量(1次元)が必要です。\\
 そして、この情報を$q=(q_{0}, q_{1}, q_{2}, q_{3})=(n_{x}\sin{\frac{\theta}{2}}, n_{y}\sin{\frac{\theta}{2}}, n_{z}\sin{\frac{\theta}{2}},\cos{\frac{\theta}{2}})$の4次元ベクトルで表現します。\\
 \begin{figure}[h]
 \begin{center}
 \includegraphics[width=30mm]{rl-kaira/quotanion.png}
 \caption{クォータニオンのイメージ}
+\label{fig:quaternion}
 \end{center}
 \end{figure}
 \subsection{行動}
@@ -121,11 +123,12 @@ KaiRAくんの行動を評価し、目標とする歩行を学習させるため
 \section{学習結果}
 \label{sec:results}
 本プロジェクトでは、Unity ML-Agentsを用いてKaiRAくんの二足歩行を学習させました。学習は$10^{7}$ステップにわたり実行され、きちんと目標に向かって歩行できるようになりました。\\
-図３は学習の進行に伴う累積報酬の推移を示しています。学習初期には報酬が低く、ランダムな動作が多かったですが、学習が進むにつれて報酬が増加し、安定した歩行が実現されました。\\
+図\ref{fig:cumulative-reward}は学習の進行に伴う累積報酬の推移を示しています。学習初期には報酬が低く、ランダムな動作が多かったですが、学習が進むにつれて報酬が増加し、安定した歩行が実現されました。\\
 \begin{figure}[h]
 \begin{center}
 \includegraphics[width=60mm]{rl-kaira/cumulative_loss.png}
 \caption{累積報酬の推移}
+\label{fig:cumulative-reward}
 \end{center}
 \end{figure}
 \section{おわりに}
