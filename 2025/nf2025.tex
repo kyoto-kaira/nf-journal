@@ -1,4 +1,4 @@
-\documentclass[dvipdfmx,openany,uplatex]{jsbook}
+\documentclass[dvipdfmx,openany,uplatex,a4paper]{jsbook}
 \usepackage[deluxe,multi,jis2004]{otf}              % 多書体フォント対応（JIS2004拡張漢字対応）
 \usepackage[dvipdfmx]{graphicx}                     % 画像表示
 \usepackage{amsmath, amssymb, amsfonts, mathtools}  % 数式表示
@@ -85,6 +85,11 @@
   \thispagestyle{empty}
   \incluedefullgraphics{cover.png}
 \end{titlepage}
+
+\thispagestyle{empty}
+\cleardoublepage
+
+\setcounter{page}{1}
 
 \chapter*{はじめに}
 \input{introduction.tex}
