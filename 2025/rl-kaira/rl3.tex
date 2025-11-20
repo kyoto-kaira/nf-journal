@@ -1,0 +1,138 @@
+\section{はじめに}
+\label{sec:intro}
+近年、強化学習によってロボットの自律的な動作が可能になりつつあります。\\
+特にロボット分野では、学習したモデルで外部環境を認識し、凹凸路や滑り面での歩行・バランス回復を組み立てるといった事例が増えています。
+そして、それを応用して災害時の救助用ロボットが開発されたりしております。\\
+今回は、歩くKaiRA君：強化学習を用いた二足歩行ロボットの歩行制御について解説します。
+% --- 第2章 ---
+\section{学習目標}
+\label{sec:target}
+本プロジェクトでは、Unity ML-Agentsを用いて、二足歩行ロボット（KaiRAくん）をシミュレーション環境で学習させる。\\
+学習環境には目標オブジェクトが存在し、図\ref{fig:kaira-overview}の矢印の方向に置かれている。\\
+KaiRAくんは、4つの関節（左右の上脚・下脚）を持ち、できるだけ早く目標に向かって歩行することを目的とする。\\
+この目的を達成するために、観測情報を基に行動（関節の目標回転角と駆動強度）を決定し、報酬関数とPPO\cite{schulman2017proximal}を用いて学習を進める。\\
+\begin{figure}[h]
+\begin{center}
+\includegraphics[width=50mm]{rl-kaira/overview.png}
+\caption{KaiRAくんの概観}
+\label{fig:kaira-overview}
+\end{center}
+\end{figure}
+\\
+% --- 第3章 ---
+\section{学習フロー}
+\label{sec:foundation}
+本節では、二足歩行ロボット（KaiRAくん）をシミュレーション環境で学習させるための具体的な構成と、学習を導くための報酬設計について述べる。
+学習フローは以下の通りである。\\
+\begin{enumerate}
+    \item \textbf{観測（Observations）}：エージェント（KaiRAくん）は、環境と自身の状態に関する情報を観測する。
+    \item \textbf{行動（Actions）}：観測情報に基づいて、行動方策（ニューラルネットワーク）によってエージェントの関節の目標回転角と駆動強度を決定する。
+    \item \textbf{環境への適用}：決定された行動が物理エンジンに適用され、KaiRAくんの動作がシミュレーションされる。
+    \item \textbf{報酬の取得（Reward）}：目標に向かって歩行する度合いに基づいて報酬を受け取る。
+    \item \textbf{学習の更新}：収集された観測、行動、報酬のデータを用いて、エージェントの行動方策がPPOによって更新される。
+\end{enumerate}
+
+\subsection{観測}
+エージェントは、環境と自身の状態に関する合計24次元の情報を観測し、これをニューラルネットワークへの入力とする。\\
+\begin{itemize}
+  \item \textbf{目標との関係（11次元）}:
+    \begin{itemize}
+        \item 目標速度と現在の平均速度の差の絶対値（1次元）
+        \item 胴体の安定化された座標系から見た現在の平均速度ベクトル（3次元）
+        \item 安定化された座標系から見た目標速度ベクトル（3次元）
+        \item 目標方向と胴体の現在の向きのズレを表すクォータニオン情報（4次元）
+    \end{itemize}
+  \item \textbf{目標位置}: 安定化された座標系からの静止した目標の相対位置（3次元）
+  \item \textbf{環境情報}: 胴体直下の地面までの正規化された距離（Raycastによる、1次元）
+  \item \textbf{身体情報（9次元）}: 各ボディパーツ（胴体、左右の上脚・下脚の計5パーツ）の地面との接触状態（5次元）および、左右の上脚・下脚（計4パーツ）の現在の関節の駆動強度（4次元）
+\end{itemize}
+\subsubsection{クォータニオンとは}
+クォータニオンは、3次元空間での回転を「どの軸を元に」「どれだけ回転するか」を表現する数学的な方法です。\\
+図\ref{fig:quaternion}で表すと、ベクトル$r^{'}$はベクトル$r$を軸$\vec{n}$の周りに$\theta$だけ回転させたものであり、これを表すには軸の情報(3次元)と回転量(1次元)が必要です。\\
+そして、この情報を$q=(q_{0}, q_{1}, q_{2}, q_{3})=(n_{x}\sin{\frac{\theta}{2}}, n_{y}\sin{\frac{\theta}{2}}, n_{z}\sin{\frac{\theta}{2}},\cos{\frac{\theta}{2}})$の4次元ベクトルで表現します。\\
+\begin{figure}[h]
+\begin{center}
+\includegraphics[width=30mm]{rl-kaira/quotanion.png}
+\caption{クォータニオンのイメージ}
+\label{fig:quaternion}
+\end{center}
+\end{figure}
+\subsection{行動}
+エージェントは、二足ロボットの4つの主要関節（左右の上脚・下脚）に対して、合計10次元の連続的な行動信号を出力する。\\
+\begin{itemize}
+  \item \textbf{関節の目標回転（6次元）}: 左右の上脚はそれぞれ2軸、下脚はそれぞれ1軸の目標回転角を決定する。これによりロボットの姿勢と歩幅が設定される。
+  \item \textbf{関節の駆動強度（4次元）}: 各関節の可動域を保ちつつ、目標とするトルクを達成するための最大の力（トルク）の上限値を決定する。
+\end{itemize}
+
+\subsubsection{駆動強度と駆動力の定義}
+強化学習における「駆動強度」と「駆動力」は、物理エンジン（$\text{Unity}$の$\text{Joint Drive}$）の制御における異なる要素を指す。\\
+\begin{itemize}
+  \item \textbf{駆動強度 (Joint Strength / Max Force Limit)}: エージェントが出力する行動信号（4次元）が直接設定する値であり、関節モーターが目標角度に到達するために出力できる\textbf{最大の力（トルク）の上限}を意味する。この値を動的に調整することで、関節を「柔らかく」（低強度）または「硬く」（高強度）制御し、着地時の衝撃吸収や地面を蹴る際の反発力を調整する戦略を学習する。
+  \item \textbf{駆動力 (Joint Force / Torque)}: 実際にエージェントの関節に加える力やトルクである。設定された\textbf{駆動強度の制限内}で、物理エンジンによって動的に計算される。
+\end{itemize}
+この制御により、エージェントは、単に目標の姿勢をとるだけでなく、その姿勢を達成・維持するための\textbf{関節の「剛性」}をも同時に学習対象とすることができる。
+
+\subsection{ニューラルネットワーク構造}
+
+\subsubsection{観測の正規化}
+観測データは、まず2つの正規化層を通過する。これにより、学習時に収集されたデータの平均と標準偏差を用いて、観測値が正規化（平均0、分散1）され、学習の安定性が高められる。
+
+\subsubsection{ネットワークの構成}
+正規化された観測ベクトルは、以下の3つの全結合層からなるボディエンコーダーに渡され、行動を決定するための潜在表現（特徴量）が抽出される。
+
+\begin{enumerate}
+    \item \textbf{第1層}: 入力観測を$512$ユニットの中間特徴量に変換する。
+    \item \textbf{第2層}: $512$ユニットを維持し、さらに深い特徴表現を学習する。
+    \item \textbf{第3層}: $512$ユニットを維持し、最終的な潜在表現を生成する。
+\end{enumerate}
+
+\subsubsection{活性化関数}
+各全結合層の出力には、\textbf{Sigmoid}活性化関数が適用されている。一般的に強化学習では$\text{ReLU}$や$\text{Tanh}$が用いられることが多いが、ここでは$\text{Sigmoid}$が採用されており、出力が$0$から$1$の範囲に制限されることで、行動の選択に対して異なる非線形性を導入している。
+
+\subsubsection{行動の出力}
+ボディエンコーダーから得られた最終的な特徴量は、行動モデルに入力され、連続的な行動（目標関節角度および駆動強度）が出力される。
+
+\begin{itemize}
+    \item \textbf{行動の平均 ($\mu$)}: 最終層の出力は、行動の平均値（`mu`）となる。
+    \item \textbf{行動の分散 ($\sigma$)}: 同時に、行動の分散（`log\_sigma`）が出力され、探索の度合い（ランダム性）を決定する。
+\end{itemize}
+これらの平均（$\mu$）と分散（$\sigma$）を用いて、最終的な連続行動がサンプリングされる。
+
+\subsection{報酬関数}
+KaiRAくんの行動を評価し、目標とする歩行を学習させるために、複数の要素を組み合わせた複合的な報酬関数が用いられている。KaiRAくんの目標は「目標速度で、目標の方向を向いて歩くこと」である。
+
+\begin{itemize}
+  \item \textbf{目標速度マッチング報酬 ($\text{Reward}\_{\text{speed}}$)}:KaiRAくんの全パーツの平均速度ベクトルと、目標とする速度ベクトル（目標方向 $\times$ 目標速度）との差が小さいほど高報酬となる。以下のSigmoid形状のカーブを用いて計算される。
+  $$\text{Reward}\_{\text{speed}} = \left(1 - \left(\frac{|\vec{v}\_{\text{actual}} - \vec{v}\_{\text{goal}}|}{\text{TargetWalkingSpeed}}\right)^2\right)^2$$
+  ここで、$\vec{v}\_{\text{actual}}$は平均速度、$\vec{v}\_{\text{goal}}$は目標速度ベクトルである。速度が完全に一致した場合に$1$に近づく。
+
+  \item \textbf{目標方向への向き報酬 ($\text{Reward}\_{\text{direction}}$)}:
+  胴体（`body.forward`）の向きが、目標とする進行方向（`cubeForward`）にどれだけ一致しているかを評価する。内積を用いて計算され、完全に一致した場合に$1$となる。
+  $$\text{Reward}\_{\text{direction}} = (\vec{d}\_{\text{goal}} \cdot \vec{d}\_{\text{body}} + 1) \times 0.5$$
+
+  \item \textbf{総合報酬}:
+  これらの報酬を乗算することで、「\textbf{目標速度を保ちつつ、目標方向へ向かう}」という複合的な目標を同時に追求させる。
+  $$\text{Total Reward} = \text{Reward}\_{\text{speed}} \times \text{Reward}\_{\text{direction}}$$
+
+  \item \textbf{接触報酬}:
+  目標オブジェクトに接触した場合は、ボーナス報酬 ($+1.0$) が加算される。
+\end{itemize}
+
+この報酬を時点$t$で得られる即時報酬$r_t$として、$G_t=\sum_{k=0}^{t-L} \gamma^{k} r_{k+L}$で表される累積報酬を最大化するように、エージェントはPPOを用いて行動方策を学習していく。
+
+\section{学習結果}
+\label{sec:results}
+本プロジェクトでは、Unity ML-Agentsを用いてKaiRAくんの二足歩行を学習させました。学習は$10^{7}$ステップにわたり実行され、きちんと目標に向かって歩行できるようになりました。\\
+図\ref{fig:cumulative-reward}は学習の進行に伴う累積報酬の推移を示しています。学習初期には報酬が低く、ランダムな動作が多かったですが、学習が進むにつれて報酬が増加し、安定した歩行が実現されました。\\
+\begin{figure}[h]
+\begin{center}
+\includegraphics[width=60mm]{rl-kaira/cumulative_loss.png}
+\caption{累積報酬の推移}
+\label{fig:cumulative-reward}
+\end{center}
+\end{figure}
+\section{おわりに}
+\label{sec:conclusion-rl}
+本プロジェクトでは、Unity ML-Agentsを用いてKaiRAくんの二足歩行を試していきました。
+平面での学習は成功したのですが、斜面や段差などの複雑な地形ではうまく歩行できませんでした。
+今後は、平面・障害物の状況を画像を用いて捉えることで、そういった地形にも対処できるような学習を目指していきたいと考えています。

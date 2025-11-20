@@ -1,0 +1,174 @@
+\documentclass[dvipdfmx,openany,uplatex,a4paper]{jsbook}
+\usepackage[deluxe,multi,jis2004]{otf}              % 多書体フォント対応（JIS2004拡張漢字対応）
+\usepackage[dvipdfmx]{graphicx}                     % 画像表示
+\usepackage{amsmath, amssymb, amsfonts, mathtools}  % 数式表示
+\usepackage{amsthm}                                 % 定理表示
+\usepackage[dvipdfmx]{hyperref}                     % 参考文献リンク
+\usepackage{subcaption}                             % 小さいキャプション
+\usepackage{url}                                    % url表示
+\usepackage{enumerate}                              % 箇条書き
+\usepackage{ascmac}                                 % 枠囲み
+\usepackage{tcolorbox}                              % 枠囲み(プロンプト部分)
+\usepackage{listings,jvlisting}                     % ソースコード表示
+\usepackage{algpseudocode}                          % 疑似コード表示
+\usepackage{algorithm}                              % アルゴリズム表示
+\usepackage{booktabs}                               % 表の罫線
+\usepackage{multirow}                               % 表のセル結合
+\usepackage{tabularx}                               % 可変幅の表
+\usepackage{siunitx}                                % 数値・単位の表示
+\usepackage{diagbox}                                % 表のセル斜線分割
+\usepackage{tikz}                                   % 図描画
+
+\usetikzlibrary{arrows.meta,positioning}
+\tcbuselibrary{breakable}
+% \usepackage[dvipdfmx]{xcolor}                   % 参考文献リンク
+
+\newcommand{\bhline}[1]{\noalign{\hrule height #1}}
+\addtolength{\fullwidth}{-26truemm}  % 全体の幅(ヘッダ部の幅)を既定値から26mm小さくする
+\setlength{\textwidth}{\fullwidth}   % 本文の幅(textwidth)を全体の幅(=ヘッダ部の幅)にそろえる
+\setlength{\evensidemargin}{1truemm} % 偶数ページの左余白を1mm(+1インチ)にする
+\setlength{\oddsidemargin}{19truemm} % 奇数ページの左余白を19mm(+1インチ)にする
+\numberwithin{equation}{section}     % 式番号を(1.〇)で表示する
+\setcounter{tocdepth}{2}             % subsubsectionまで目次に表示する
+
+%%% ソースコード表示の設定 %%%
+\lstset{
+  basicstyle={\ttfamily},
+  identifierstyle={\small},
+  commentstyle={\smallitshape},
+  keywordstyle={\small\bfseries},
+  ndkeywordstyle={\small},
+  stringstyle={\small\ttfamily},
+  frame={tb},
+  breaklines=true,
+  columns=[l]{fullflexible},
+  numbers=left,
+  xrightmargin=0zw,
+  xleftmargin=3zw,
+  numberstyle={\scriptsize},
+  stepnumber=1,
+  numbersep=1zw,
+  lineskip=-0.5ex
+}
+\renewcommand{\lstlistingname}{コード}
+
+%%%% 表紙用設定 %%%%
+\hoffset0mm
+\voffset0mm
+\makeatletter
+\let\@@shipout\shipout
+\def\shipout\vbox{\@@shipout\vbox\bgroup\afterassignment\insertBackGround\let\reserved@a=}
+\def\insertBackGround#1{#1%
+        \iftombow
+                \copy\BackGround\kern0pt
+        \else
+                \kern-1truein\moveleft1truein\copy\BackGround\kern1truein
+        \fi}
+\newbox\BackGroundUnit
+\newbox\BackGround
+\def\@haikei#1{
+\setbox\BackGroundUnit\hbox{\includegraphics*[width=\paperwidth]{#1}}
+\@tempdima\paperheight
+\advance\@tempdima\ht\BackGroundUnit\advance\@tempdima\dp\BackGroundUnit
+\setbox\BackGround\vbox to \@tempdima{
+        \@tempdima=\paperwidth\advance\@tempdima\wd\BackGroundUnit
+        \leaders\hbox to\@tempdima{\leaders\copy\BackGroundUnit\hfil}\vfil
+}
+\wd\BackGround=0pt\ht\BackGround=0pt\dp\BackGround=0pt
+}
+\newcommand{\incluedefullgraphics}[1]{\pagestyle{empty}\@haikei{#1}\null}
+\makeatother
+%%%%%%%%%%%%%%%%%%%%
+
+\begin{document}
+\begin{titlepage}
+  \thispagestyle{empty}
+  \incluedefullgraphics{cover.png}
+\end{titlepage}
+
+\thispagestyle{empty}
+\cleardoublepage
+
+\setcounter{page}{1}
+
+\chapter*{はじめに}
+\input{introduction.tex}
+
+\tableofcontents
+
+\chapter{ニューラルネットワーク入門}\label{chap:nn-intro}
+\input{nn-intro/nn-intro.tex}
+
+\chapter{画像生成入門} \label{chap:img-gen}
+\input{image-gen/image-gen.tex}
+
+\chapter{事前学習済みTransformerを用いた化学反応収率のベイズ最適化}\label{chap:bo-yield}
+\input{bo-yield/bo-yield.tex}
+
+\chapter{Agenticな京大シラバス検索・時間割作成システム}\label{chap:syllabus}
+\input{syllabus/syllabus.tex}
+
+\chapter{音楽と自然言語の類似度測定システムの開発}\label{chap:music-gen}
+\input{music-gen/ms.tex}
+
+\chapter{顔認識で操作するゲーム}\label{chap:face-game}
+\input{face-game/face-game.tex}
+
+\chapter{歩くKaiRA君：強化学習を用いた二足歩行ロボットの歩行制御}\label{chap:rl-kaira}
+\input{rl-kaira/rl3.tex}
+
+
+
+\bibliographystyle{junsrt}
+\bibliography{
+    bo-yield/ref,
+    face-game/ref,
+    music-gen/scholar,
+    rl-kaira/scholar,
+    syllabus/refs,
+    image-gen/refs
+}
+\nocite{*}
+
+\chapter*{本会誌について}
+\section*{執筆者}
+\subparagraph*{第\ref{chap:nn-intro}章：ニューラルネットワーク入門}
+岡本和優
+\subparagraph*{第\ref{chap:img-gen}章：画像生成入門}
+宮前明生
+\subparagraph*{第\ref{chap:bo-yield}章：事前学習済みTransformerを用いた化学反応収率のベイズ最適化}
+岡本和優
+\subparagraph*{第\ref{chap:syllabus}章：Agenticな京大シラバス検索・時間割作成システム}
+千葉一世、神原みちる
+\subparagraph*{第\ref{chap:music-gen}章：音楽と自然言語の類似度測定システムの開発}
+稲葉陽孔、佐藤海里
+\subparagraph*{第\ref{chap:face-game}章：顔認識で操作するゲーム}
+岡本和優、坂本竜弥
+\subparagraph*{第\ref{chap:rl-kaira}章：歩くKaiRA君：強化学習を用いた二足歩行ロボットの歩行制御}
+稲葉陽孔
+
+
+\section*{京都大学人工知能研究会KaiRA}
+\subparagraph*{代　　表} 岡本和優
+\subparagraph*{活動日時} 毎週木曜日 18:40～21:00、毎週土曜日 10:00～12:00
+\subparagraph*{活動場所} 文学部教室・株式会社Athena\ 京都オフィス（百万遍ビル3F）など
+\subparagraph*{入会資格} 大学、学部、回生問わず、AIに興味がある方
+\subparagraph*{会　　費} 無料
+\subparagraph*{活動内容} 機械学習に関する本の輪読会、コード読み・実装会、kaggleへの参加など
+
+
+\begin{table}[b]
+	\centering
+	\begin{tabular}{lcll}
+		\multicolumn{4}{c}{ {\LARGE 会誌 vol.9} }	\\
+		\bhline{1pt}
+		発行日 && 2025年11月吉日　初版発行&\\
+		発行 && 京都大学人工知能研究会KaiRA&\\
+		公式サイト && \url{https://kyoto-kaira.github.io/}&\\
+    メールアドレス && \url{kyoto.kaira@gmail.com}&\\
+		X(旧Twitter) && \url{https://x.com/kyoto_kaira}&\\
+		\bhline{1pt}
+	\end{tabular}
+\end{table}
+
+\end{document}
